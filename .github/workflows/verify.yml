@@ -31,6 +31,7 @@ jobs:
       - run: npm run manifest:check
       - run: python3 -m unittest discover -s test -p '*_test.py'
       - run: npm run demo
+      - run: npm run demo:relay
       - name: Check generated AWS template
         run: |
           python3 aws/generate-stack.py

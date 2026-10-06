@@ -11,9 +11,11 @@ and quarantines uncertain delivery to avoid automatic duplicate posts.
 **The continuous worker is a metadata relay.** It does not generate AI summaries,
 research topics, or read full threads. A separate consumer bot must receive the
 references, access the original source using its own authorized Slack connection,
-and implement any summaries or private delivery you want. That consumer and its
-credentials are not included in this repository. An offline heuristic summary
-demo and separately gated, bounded local experiments are included.
+and implement any summaries or private delivery you want. This repository includes
+a [reusable consumer adapter and integration guide](docs/consumer-setup.md), with
+local-rule updates by default. It does not deploy a consumer service or include
+consumer credentials or an AI integration. Offline demos and separately gated,
+bounded local experiments are included.
 
 ```mermaid
 flowchart LR
@@ -40,6 +42,7 @@ git clone https://github.com/Moriyan1307/thread-watch-oss.git
 cd thread-watch-oss
 npm ci --ignore-scripts
 npm run demo
+npm run demo:relay
 npm test
 npm run typecheck
 npm run build
@@ -121,6 +124,9 @@ expiry and requires separate private-DM approval.
   Secrets Manager, SSM administration, and a Linux systemd worker.
 - [Relay contract](docs/relay-contract.md): what a consumer receives and how to
   handle it safely.
+- [Consumer setup](docs/consumer-setup.md): reusable parsing/queue/summary adapters
+  and a generic instruction template for your authorized workflow.
+- [Two-minute demo](docs/demo.md) and [fresh-install acceptance](docs/installation-checklist.md).
 
 Run only one active worker for an installation. `npm start` and Slack CLI
 start/deploy hooks deliberately fail closed; they do not bypass owner setup.
