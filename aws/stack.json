@@ -1,0 +1,434 @@
+{
+  "AWSTemplateFormatVersion": "2010-09-09",
+  "Description": "Isolated Thread Watch continuous Slack mention relay; owner enters existing tokens privately.",
+  "Parameters": {
+    "AvailabilityZone": {
+      "Type": "AWS::EC2::AvailabilityZone::Name"
+    },
+    "AmiId": {
+      "Type": "AWS::EC2::Image::Id"
+    },
+    "TeamId": {
+      "Type": "String",
+      "AllowedPattern": "T[A-Z0-9]+"
+    },
+    "TargetUserId": {
+      "Type": "String",
+      "AllowedPattern": "U[A-Z0-9]+"
+    },
+    "SlackAppId": {
+      "Type": "String",
+      "AllowedPattern": "A[A-Z0-9]+"
+    },
+    "BotUserId": {
+      "Type": "String",
+      "AllowedPattern": "U[A-Z0-9]+"
+    },
+    "BotId": {
+      "Type": "String",
+      "AllowedPattern": "B[A-Z0-9]+"
+    },
+    "ProcessorUserId": {
+      "Type": "String",
+      "AllowedPattern": "U[A-Z0-9]+"
+    },
+    "RelayChannelId": {
+      "Type": "String",
+      "AllowedPattern": "[CG][A-Z0-9]+"
+    },
+    "RelayVerifiedPrivate": {
+      "Type": "String",
+      "AllowedValues": [
+        "denied",
+        "approved"
+      ],
+      "Default": "denied"
+    },
+    "WatchChannelIds": {
+      "Type": "String",
+      "Default": "",
+      "AllowedPattern": "(?:[CG][A-Z0-9]+(?:,[CG][A-Z0-9]+)*)?"
+    }
+  },
+  "Resources": {
+    "Vpc": {
+      "Type": "AWS::EC2::VPC",
+      "Properties": {
+        "CidrBlock": "172.29.240.0/24",
+        "EnableDnsSupport": true,
+        "EnableDnsHostnames": true,
+        "Tags": [
+          {
+            "Key": "Name",
+            "Value": {
+              "Fn::Sub": "${AWS::StackName}-vpc"
+            }
+          }
+        ]
+      }
+    },
+    "Gateway": {
+      "Type": "AWS::EC2::InternetGateway"
+    },
+    "GatewayAttachment": {
+      "Type": "AWS::EC2::VPCGatewayAttachment",
+      "Properties": {
+        "VpcId": {
+          "Ref": "Vpc"
+        },
+        "InternetGatewayId": {
+          "Ref": "Gateway"
+        }
+      }
+    },
+    "Subnet": {
+      "Type": "AWS::EC2::Subnet",
+      "Properties": {
+        "VpcId": {
+          "Ref": "Vpc"
+        },
+        "AvailabilityZone": {
+          "Ref": "AvailabilityZone"
+        },
+        "CidrBlock": "172.29.240.0/26"
+      }
+    },
+    "RouteTable": {
+      "Type": "AWS::EC2::RouteTable",
+      "Properties": {
+        "VpcId": {
+          "Ref": "Vpc"
+        }
+      }
+    },
+    "Route": {
+      "Type": "AWS::EC2::Route",
+      "DependsOn": "GatewayAttachment",
+      "Properties": {
+        "RouteTableId": {
+          "Ref": "RouteTable"
+        },
+        "DestinationCidrBlock": "0.0.0.0/0",
+        "GatewayId": {
+          "Ref": "Gateway"
+        }
+      }
+    },
+    "RouteAssociation": {
+      "Type": "AWS::EC2::SubnetRouteTableAssociation",
+      "Properties": {
+        "SubnetId": {
+          "Ref": "Subnet"
+        },
+        "RouteTableId": {
+          "Ref": "RouteTable"
+        }
+      }
+    },
+    "SecurityGroup": {
+      "Type": "AWS::EC2::SecurityGroup",
+      "Properties": {
+        "GroupDescription": "Radar outbound HTTPS and package updates; no inbound ports",
+        "VpcId": {
+          "Ref": "Vpc"
+        },
+        "SecurityGroupIngress": [],
+        "SecurityGroupEgress": [
+          {
+            "IpProtocol": "tcp",
+            "FromPort": 80,
+            "ToPort": 80,
+            "CidrIp": "0.0.0.0/0"
+          },
+          {
+            "IpProtocol": "tcp",
+            "FromPort": 443,
+            "ToPort": 443,
+            "CidrIp": "0.0.0.0/0"
+          }
+        ]
+      }
+    },
+    "Artifacts": {
+      "Type": "AWS::S3::Bucket",
+      "DeletionPolicy": "Retain",
+      "UpdateReplacePolicy": "Retain",
+      "Properties": {
+        "PublicAccessBlockConfiguration": {
+          "BlockPublicAcls": true,
+          "BlockPublicPolicy": true,
+          "IgnorePublicAcls": true,
+          "RestrictPublicBuckets": true
+        },
+        "OwnershipControls": {
+          "Rules": [
+            {
+              "ObjectOwnership": "BucketOwnerEnforced"
+            }
+          ]
+        },
+        "BucketEncryption": {
+          "ServerSideEncryptionConfiguration": [
+            {
+              "ServerSideEncryptionByDefault": {
+                "SSEAlgorithm": "AES256"
+              }
+            }
+          ]
+        },
+        "VersioningConfiguration": {
+          "Status": "Enabled"
+        },
+        "LifecycleConfiguration": {
+          "Rules": [
+            {
+              "Id": "expire-old-code",
+              "Status": "Enabled",
+              "NoncurrentVersionExpiration": {
+                "NoncurrentDays": 7
+              },
+              "AbortIncompleteMultipartUpload": {
+                "DaysAfterInitiation": 1
+              }
+            }
+          ]
+        }
+      }
+    },
+    "ArtifactPolicy": {
+      "Type": "AWS::S3::BucketPolicy",
+      "Properties": {
+        "Bucket": {
+          "Ref": "Artifacts"
+        },
+        "PolicyDocument": {
+          "Version": "2012-10-17",
+          "Statement": [
+            {
+              "Effect": "Deny",
+              "Principal": "*",
+              "Action": "s3:*",
+              "Resource": [
+                {
+                  "Fn::GetAtt": [
+                    "Artifacts",
+                    "Arn"
+                  ]
+                },
+                {
+                  "Fn::Sub": "${Artifacts.Arn}/*"
+                }
+              ],
+              "Condition": {
+                "Bool": {
+                  "aws:SecureTransport": "false"
+                }
+              }
+            }
+          ]
+        }
+      }
+    },
+    "SlackSecret": {
+      "Type": "AWS::SecretsManager::Secret",
+      "DeletionPolicy": "Retain",
+      "UpdateReplacePolicy": "Retain",
+      "Properties": {
+        "Name": {
+          "Fn::Sub": "${AWS::StackName}/slack"
+        },
+        "Description": "Owner-managed existing Radar Slack tokens. Agent must never read values."
+      }
+    },
+    "WorkerRole": {
+      "Type": "AWS::IAM::Role",
+      "Properties": {
+        "AssumeRolePolicyDocument": {
+          "Version": "2012-10-17",
+          "Statement": [
+            {
+              "Effect": "Allow",
+              "Principal": {
+                "Service": "ec2.amazonaws.com"
+              },
+              "Action": "sts:AssumeRole"
+            }
+          ]
+        },
+        "ManagedPolicyArns": [
+          {
+            "Fn::Sub": "arn:${AWS::Partition}:iam::aws:policy/AmazonSSMManagedInstanceCore"
+          }
+        ],
+        "Policies": [
+          {
+            "PolicyName": "RadarOnly",
+            "PolicyDocument": {
+              "Version": "2012-10-17",
+              "Statement": [
+                {
+                  "Effect": "Allow",
+                  "Action": [
+                    "secretsmanager:GetSecretValue",
+                    "secretsmanager:DescribeSecret"
+                  ],
+                  "Resource": {
+                    "Ref": "SlackSecret"
+                  }
+                },
+                {
+                  "Effect": "Allow",
+                  "Action": [
+                    "s3:GetObject"
+                  ],
+                  "Resource": {
+                    "Fn::Sub": "${Artifacts.Arn}/releases/*"
+                  }
+                }
+              ]
+            }
+          }
+        ]
+      }
+    },
+    "WorkerProfile": {
+      "Type": "AWS::IAM::InstanceProfile",
+      "Properties": {
+        "Roles": [
+          {
+            "Ref": "WorkerRole"
+          }
+        ]
+      }
+    },
+    "DataVolume": {
+      "Type": "AWS::EC2::Volume",
+      "DeletionPolicy": "Retain",
+      "UpdateReplacePolicy": "Retain",
+      "Properties": {
+        "AvailabilityZone": {
+          "Ref": "AvailabilityZone"
+        },
+        "Size": 1,
+        "VolumeType": "gp3",
+        "Encrypted": true,
+        "Tags": [
+          {
+            "Key": "Name",
+            "Value": {
+              "Fn::Sub": "${AWS::StackName}-queue"
+            }
+          },
+          {
+            "Key": "Project",
+            "Value": "thread-watch"
+          }
+        ]
+      }
+    },
+    "Worker": {
+      "Type": "AWS::EC2::Instance",
+      "DependsOn": [
+        "Route",
+        "RouteAssociation"
+      ],
+      "Properties": {
+        "ImageId": {
+          "Ref": "AmiId"
+        },
+        "InstanceType": "t4g.micro",
+        "IamInstanceProfile": {
+          "Ref": "WorkerProfile"
+        },
+        "NetworkInterfaces": [
+          {
+            "DeviceIndex": "0",
+            "AssociatePublicIpAddress": true,
+            "SubnetId": {
+              "Ref": "Subnet"
+            },
+            "GroupSet": [
+              {
+                "Ref": "SecurityGroup"
+              }
+            ]
+          }
+        ],
+        "MetadataOptions": {
+          "HttpTokens": "required",
+          "HttpEndpoint": "enabled",
+          "HttpPutResponseHopLimit": 1
+        },
+        "CreditSpecification": {
+          "CPUCredits": "standard"
+        },
+        "BlockDeviceMappings": [
+          {
+            "DeviceName": "/dev/xvda",
+            "Ebs": {
+              "VolumeSize": 8,
+              "VolumeType": "gp3",
+              "Encrypted": true,
+              "DeleteOnTermination": true
+            }
+          }
+        ],
+        "UserData": {
+          "Fn::Base64": {
+            "Fn::Sub": "#!/usr/bin/env bash\nset -euo pipefail\numask 077\ndnf install -y curl-minimal tar xz util-linux e2fsprogs python3 awscli-2 aws-workload-credentials-provider\nid radar >/dev/null 2>&1 || useradd --system --create-home --shell /sbin/nologin radar\nusermod -aG aws-wcp-token radar\ninstall -d -m 0755 /opt/thread-watch-node\ncurl --fail --silent --show-error --location --max-time 120 https://nodejs.org/dist/v24.21.0/node-v24.21.0-linux-arm64.tar.xz -o /var/tmp/radar-node.tar.xz\nprintf '%s  %s\\n' 6ad1325edbdb5649c379b75a237147a666c95d4f9ae8d340fef2d1575d289ad2 /var/tmp/radar-node.tar.xz | sha256sum --check --status\ntar --extract --xz --file /var/tmp/radar-node.tar.xz --directory /opt/thread-watch-node --strip-components=1\nrm /var/tmp/radar-node.tar.xz\nradar_volume_id='${DataVolume}'\nradar_nvme_name=\"nvme-Amazon_Elastic_Block_Store_$(printf '%s' \"$radar_volume_id\" | tr -d '-')\"\nradar_device=\"/dev/disk/by-id/$radar_nvme_name\"\nfor radar_wait in $(seq 1 120); do\n  test -b \"$radar_device\" && break\n  sleep 2\ndone\ntest -b \"$radar_device\"\nif ! blkid \"$radar_device\" >/dev/null 2>&1; then\n  mkfs.ext4 \"$radar_device\"\nfi\nradar_uuid=$(blkid -s UUID -o value \"$radar_device\")\ninstall -d -m 0700 /var/lib/thread-watch\nprintf 'UUID=%s /var/lib/thread-watch ext4 defaults,nodev,nosuid,noexec 0 2\\n' \"$radar_uuid\" >> /etc/fstab\nmount /var/lib/thread-watch\nchown radar:radar /var/lib/thread-watch\nchmod 0700 /var/lib/thread-watch\ninstall -d -m 0700 /etc/thread-watch\ncat > /etc/thread-watch/runtime.env <<'RADAR_ENV'\nAWS_REGION=${AWS::Region}\nRADAR_AWS_ACCOUNT_ID=${AWS::AccountId}\nRADAR_TEAM_ID=${TeamId}\nRADAR_USER_ID=${TargetUserId}\nRADAR_APP_ID=${SlackAppId}\nRADAR_CONFIRMED_SEPARATE_APP_ID=${SlackAppId}\nRADAR_BOT_USER_ID=${BotUserId}\nRADAR_BOT_ID=${BotId}\nRADAR_PROCESSOR_USER_ID=${ProcessorUserId}\nRADAR_RELAY_MEMBER_USER_IDS=${TargetUserId},${BotUserId},${ProcessorUserId}\nRADAR_RELAY_VERIFIED_PRIVATE=${RelayVerifiedPrivate}\nRADAR_ALLOW_SLACK_CONNECTION=approved\nRADAR_ALLOW_SLACK_READS=approved\nRADAR_ALLOW_PRIVATE_RELAY=approved\nRADAR_RELAY_CHANNEL_ID=${RelayChannelId}\nRADAR_WATCH_CHANNEL_IDS=${WatchChannelIds}\nRADAR_ALLOW_CHANNEL_MONITORING=approved\nRADAR_FOLLOW_MENTION_THREADS=approved\nRADAR_VERIFIED_APP_SCOPES=connections:write\nRADAR_ALLOW_CONTINUOUS=approved\nRADAR_DEPLOYMENT_APPROVED=approved\nRADAR_DATA_DIRECTORY=/var/lib/thread-watch\nRADAR_SLACK_SECRET_ARN=${SlackSecret}\nRADAR_ENV\nchmod 0600 /etc/thread-watch/runtime.env\nprintf '%s\\n' 'Radar bootstrap ready. Slack runtime remains stopped pending code and secure activation.'\n"
+          }
+        },
+        "Tags": [
+          {
+            "Key": "Name",
+            "Value": {
+              "Fn::Sub": "${AWS::StackName}-worker"
+            }
+          },
+          {
+            "Key": "Project",
+            "Value": "thread-watch"
+          }
+        ]
+      }
+    },
+    "DataAttachment": {
+      "Type": "AWS::EC2::VolumeAttachment",
+      "Properties": {
+        "InstanceId": {
+          "Ref": "Worker"
+        },
+        "VolumeId": {
+          "Ref": "DataVolume"
+        },
+        "Device": "/dev/sdf"
+      }
+    }
+  },
+  "Outputs": {
+    "WorkerId": {
+      "Value": {
+        "Ref": "Worker"
+      },
+      "Description": "Dedicated Radar instance for SSM administration"
+    },
+    "ArtifactBucket": {
+      "Value": {
+        "Ref": "Artifacts"
+      },
+      "Description": "Private code-only source artifact bucket"
+    },
+    "SlackSecretArn": {
+      "Value": {
+        "Ref": "SlackSecret"
+      },
+      "Description": "Non-secret ARN for owner-private credential entry"
+    },
+    "DataVolumeId": {
+      "Value": {
+        "Ref": "DataVolume"
+      },
+      "Description": "Encrypted queue disk retained on stack deletion"
+    }
+  }
+}

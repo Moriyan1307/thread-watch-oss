@@ -1,0 +1,15 @@
+import { readFileSync } from 'node:fs';
+import assert from 'node:assert/strict';
+const m = JSON.parse(readFileSync(new URL('../manifest.json', import.meta.url), 'utf8'));
+assert.deepEqual(m.settings.event_subscriptions.user_events, ['message.channels', 'message.groups', 'message.im', 'message.mpim']);
+assert.equal(m.settings.event_subscriptions.bot_events, undefined);
+assert.deepEqual(m.oauth_config.scopes.user, ['channels:history', 'groups:history', 'im:history', 'mpim:history']);
+assert.deepEqual(m.oauth_config.scopes.bot, ['chat:write', 'im:write']);
+assert.equal(m.settings.org_deploy_enabled, false);
+assert.equal(m.settings.socket_mode_enabled, true);
+assert.equal(m.settings.is_hosted, false);
+assert.equal(m.settings.token_rotation_enabled, false);
+assert.equal(m.settings.event_subscriptions.request_url, undefined);
+assert.deepEqual(Object.keys(m.oauth_config.scopes).sort(), ['bot', 'user']);
+assert.deepEqual(Object.keys(m.settings.event_subscriptions), ['user_events']);
+console.log('Local Socket Mode manifest policy checks passed. App-level connections:write is separate; Slack server validation/install has not run.');

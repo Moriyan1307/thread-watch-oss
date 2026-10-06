@@ -1,0 +1,32 @@
+{
+  "name": "thread-watch",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Self-hosted Slack mention and thread watcher with a durable metadata relay",
+  "engines": {
+    "node": ">=22.18.0"
+  },
+  "scripts": {
+    "test": "node --import ./test/env.mjs --test test/*.test.ts",
+    "typecheck": "tsc --noEmit",
+    "build": "tsc -p tsconfig.build.json",
+    "demo": "node --env-file=examples/demo.env src/demo.ts",
+    "start": "node scripts/runtime-disabled.mjs",
+    "start:local": "node --env-file=.env src/start-local.ts",
+    "check:user-token": "node --env-file=.env src/check-user-token.ts",
+    "relay:test:live": "node --env-file=.env src/test-relay.ts",
+    "start:relay-test": "node --env-file=.env src/start-relay-local.ts",
+    "manifest:check": "node scripts/check-manifest.mjs"
+  },
+  "dependencies": {
+    "@slack/bolt": "5.1.0",
+    "@slack/socket-mode": "3.1.0",
+    "@slack/web-api": "8.2.0"
+  },
+  "devDependencies": {
+    "@types/node": "26.6.4",
+    "typescript": "7.0.2"
+  },
+  "license": "MIT"
+}

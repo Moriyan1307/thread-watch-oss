@@ -1,0 +1,49 @@
+let buckets = Resources.*[ Type == 'AWS::S3::Bucket' ]
+let volumes = Resources.*[ Type == 'AWS::EC2::Volume' ]
+let workers = Resources.*[ Type == 'AWS::EC2::Instance' ]
+let groups = Resources.*[ Type == 'AWS::EC2::SecurityGroup' ]
+let secrets = Resources.*[ Type == 'AWS::SecretsManager::Secret' ]
+
+rule private_encrypted_artifacts {
+  %buckets {
+    DeletionPolicy == 'Retain'
+    UpdateReplacePolicy == 'Retain'
+    Properties.PublicAccessBlockConfiguration {
+      BlockPublicAcls == true
+      BlockPublicPolicy == true
+      IgnorePublicAcls == true
+      RestrictPublicBuckets == true
+    }
+    Properties.BucketEncryption.ServerSideEncryptionConfiguration[*].ServerSideEncryptionByDefault.SSEAlgorithm == 'AES256'
+    Properties.VersioningConfiguration.Status == 'Enabled'
+  }
+}
+rule encrypted_retained_queue {
+  %volumes {
+    DeletionPolicy == 'Retain'
+    UpdateReplacePolicy == 'Retain'
+    Properties.Encrypted == true
+    Properties.VolumeType == 'gp3'
+  }
+}
+rule hardened_small_worker {
+  %workers.Properties {
+    InstanceType == 't4g.micro'
+    MetadataOptions.HttpTokens == 'required'
+    MetadataOptions.HttpPutResponseHopLimit == 1
+    CreditSpecification.CPUCredits == 'standard'
+    BlockDeviceMappings[*].Ebs.Encrypted == true
+    KeyName !exists
+  }
+}
+rule no_inbound_ports {
+  %groups.Properties.SecurityGroupIngress empty
+}
+rule no_credentials_in_template {
+  %secrets {
+    DeletionPolicy == 'Retain'
+    UpdateReplacePolicy == 'Retain'
+    Properties.SecretString !exists
+    Properties.GenerateSecretString !exists
+  }
+}

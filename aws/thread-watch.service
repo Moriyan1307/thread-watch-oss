@@ -1,0 +1,38 @@
+[Unit]
+Description=Thread Watch Slack mention relay
+After=network-online.target aws-workload-credentials-provider-sm.service aws-workload-credentials-provider-token.service
+Wants=network-online.target
+Requires=aws-workload-credentials-provider-sm.service aws-workload-credentials-provider-token.service
+RequiresMountsFor=/var/lib/thread-watch
+StartLimitIntervalSec=0
+
+[Service]
+Type=simple
+User=radar
+Group=radar
+SupplementaryGroups=aws-wcp-token
+WorkingDirectory=/opt/thread-watch
+EnvironmentFile=/etc/thread-watch/runtime.env
+ExecStart=/usr/bin/python3 /opt/thread-watch/aws/hosted-run.py
+Restart=on-failure
+RestartSec=15
+RestartPreventExitStatus=78
+TimeoutStopSec=35
+KillMode=control-group
+LimitCORE=0
+UMask=0077
+RuntimeDirectory=thread-watch
+RuntimeDirectoryMode=0700
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=true
+ReadWritePaths=/var/lib/thread-watch /run/thread-watch
+RestrictSUIDSGID=true
+LockPersonality=true
+RestrictAddressFamilies=AF_UNIX AF_INET AF_INET6
+StandardOutput=journal
+StandardError=journal
+
+[Install]
+WantedBy=multi-user.target

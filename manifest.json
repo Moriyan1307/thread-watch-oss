@@ -1,0 +1,50 @@
+{
+  "_metadata": {
+    "major_version": 1,
+    "minor_version": 1
+  },
+  "display_information": {
+    "name": "Thread Watch",
+    "description": "Self-hosted mention and thread monitoring",
+    "background_color": "#172B4D"
+  },
+  "features": {
+    "bot_user": {
+      "display_name": "Thread Watch",
+      "always_online": false
+    },
+    "app_home": {
+      "home_tab_enabled": false,
+      "messages_tab_enabled": true,
+      "messages_tab_read_only_enabled": true
+    }
+  },
+  "oauth_config": {
+    "scopes": {
+      "user": [
+        "channels:history",
+        "groups:history",
+        "im:history",
+        "mpim:history"
+      ],
+      "bot": [
+        "chat:write",
+        "im:write"
+      ]
+    }
+  },
+  "settings": {
+    "is_hosted": false,
+    "event_subscriptions": {
+      "user_events": [
+        "message.channels",
+        "message.groups",
+        "message.im",
+        "message.mpim"
+      ]
+    },
+    "socket_mode_enabled": true,
+    "org_deploy_enabled": false,
+    "token_rotation_enabled": false
+  }
+}
