@@ -64,6 +64,26 @@ is working. Verify a natural qualifying event after installation.
 
 ## Configure your own Slack installation
 
+The recommended path is a guided wizard. You do not need to edit environment
+variables or look up the workspace, monitored-user or watcher-bot IDs yourself.
+
+1. Install the watcher using [manifest.json](manifest.json) and prepare your
+   [separate consumer](docs/consumer-setup.md). Workspace admin approval may be required.
+2. Create a private relay containing only you, the watcher bot and consumer bot.
+3. In your own private Terminal, run `npm run setup`. Enter the user and watcher
+   bot tokens in hidden prompts, supply three remaining IDs and choose your
+   monitoring preferences. The wizard verifies identity/scopes and creates `.env`
+   with private permissions; it never saves tokens or starts a worker.
+4. Follow [macOS hosting](docs/macos.md) or the separate [AWS deployment guide](docs/aws.md).
+
+See [guided setup](docs/setup.md) for prerequisites, where to find the three IDs,
+what is generated and which steps remain manual. `npm run setup -- --help`
+prints the requirements without contacting Slack. Existing `.env` files are
+left untouched; do not run the wizard to reconfigure an active installation.
+
+<details>
+<summary>Advanced: configure environment variables manually</summary>
+
 1. Create a Slack app in your workspace using [manifest.json](manifest.json).
    Obtain an app-level token with **only** `connections:write`, a user token for
    the person being monitored, and a bot token for this watcher app. Workspace
@@ -106,6 +126,8 @@ The `RADAR_` variable names and `Radar source v1/v2` relay headers are retained 
 protocol compatibility. `examples/demo.env` contains synthetic fixtures only;
 never use its identities as a live installation configuration. Identity
 configuration is fixed at process startup; restart to apply changes.
+
+</details>
 
 The user token can access message history, including private conversations
 available to that user. Review that access and any channel monitoring with your

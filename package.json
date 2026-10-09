@@ -13,6 +13,7 @@
     "build": "tsc -p tsconfig.build.json",
     "demo": "node --env-file=examples/demo.env src/demo.ts",
     "demo:relay": "node --env-file=examples/demo.env examples/relay-demo.mjs",
+    "setup": "node src/setup.ts",
     "start": "node scripts/runtime-disabled.mjs",
     "start:local": "node --env-file=.env src/start-local.ts",
     "check:user-token": "node --env-file=.env src/check-user-token.ts",
