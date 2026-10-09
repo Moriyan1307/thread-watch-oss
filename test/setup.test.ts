@@ -4,13 +4,13 @@ import { spawnSync } from 'node:child_process';
 import { existsSync, mkdtempSync, readFileSync, rmSync, statSync, symlinkSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { setup } from '../src/setup.ts';
+import { SETUP_HELP, createAppUrl, setup } from '../src/setup.ts';
 import { BOT_SCOPES, USER_SCOPES } from '../src/config.ts';
 
 const user = { team_id: 'TSETUP001', user_id: 'USETUP001', scopes: [...USER_SCOPES, 'identify'] };
 const bot = { team_id: 'TSETUP001', user_id: 'USETUPBOT', bot_id: 'BSETUPBOT', scopes: [...BOT_SCOPES] };
 const userToken = 'xoxp-synthetic-setup-only'; const botToken = 'xoxb-synthetic-setup-only';
-function fixture(directory: string, answers = ['yes', 'ASETUP001', 'UCONSUMER', 'CRELAY001', 'yes', 'CWATCH001, CWATCH001, GWATCH002', 'yes', 'yes']) {
+function fixture(directory: string, answers = ['yes', 'yes', 'ASETUP001', 'UCONSUMER', 'CRELAY001', 'yes', 'CWATCH001, CWATCH001, GWATCH002', 'yes', 'yes']) {
   const output: string[] = []; let prompts = 0; let auths = 0; let secrets = 0;
   return {
     output, counts: () => ({ prompts, auths, secrets }),
@@ -24,12 +24,26 @@ function fixture(directory: string, answers = ['yes', 'ASETUP001', 'UCONSUMER', 
     }
   };
 }
+test('prefilled creation link contains exactly the checked-in manifest and needs no terminal or credentials', () => {
+  const url = new URL(createAppUrl());
+  assert.equal(url.origin + url.pathname, 'https://api.slack.com/apps');
+  assert.equal(url.searchParams.get('new_app'), '1');
+  assert.deepEqual([...url.searchParams.keys()], ['new_app', 'manifest_json']);
+  assert.deepEqual(JSON.parse(url.searchParams.get('manifest_json')!), JSON.parse(readFileSync('manifest.json', 'utf8')));
+  const result = spawnSync(process.execPath, ['src/setup.ts', '--create-app-link'], { encoding: 'utf8', timeout: 5000 });
+  assert.equal(result.status, 0, result.stderr);
+  assert.equal(result.stdout.trim(), url.href);
+  assert.match(SETUP_HELP, /working separate consumer/i);
+});
 test('guided setup discovers identities and creates private token-free configuration accepted by existing preflight', async () => {
   const directory = mkdtempSync(join(tmpdir(), 'thread-watch-setup-'));
   try {
     const f = fixture(directory);
     assert.equal(await setup(f.options), 0);
-    assert.deepEqual(f.counts(), { prompts: 8, auths: 2, secrets: 2 });
+    assert.deepEqual(f.counts(), { prompts: 9, auths: 2, secrets: 2 });
+    assert.match(f.output.join('\n'), /OAuth & Permissions/);
+    assert.match(f.output.join('\n'), /App-Level Tokens/);
+    assert.match(f.output.join('\n'), /does not install or run that service/);
     const file = join(directory, '.env'); const text = readFileSync(file, 'utf8');
     const env = Object.fromEntries(text.split('\n').filter(line => line && !line.startsWith('#')).map(line => {
       const index = line.indexOf('='); return [line.slice(0, index), line.slice(index + 1)];
@@ -67,12 +81,18 @@ test('setup refuses nonprivate terminals, existing files and dangling symlinks b
 test('declining any required approval writes nothing; optional monitoring remains off unless chosen', async () => {
   const directory = mkdtempSync(join(tmpdir(), 'thread-watch-setup-'));
   try {
-    for (const answers of [['no'], ['yes', 'ASETUP001', 'UCONSUMER', 'CRELAY001', 'no'],
-      ['yes', 'ASETUP001', 'UCONSUMER', 'CRELAY001', 'yes', '', '', 'no']]) {
-      assert.equal(await setup(fixture(directory, answers).options), 1);
+    for (const answers of [['no'], ['yes', 'no'], ['yes', 'yes', 'ASETUP001', 'UCONSUMER', 'CRELAY001', 'no'],
+      ['yes', 'yes', 'ASETUP001', 'UCONSUMER', 'CRELAY001', 'yes', '', '', 'no']]) {
+      const f = fixture(directory, answers);
+      const declinedBeforeAuthentication = answers.length <= 2;
+      assert.equal(await setup(f.options), 1);
+      if (declinedBeforeAuthentication) {
+        assert.equal(f.counts().auths, 0);
+        assert.equal(f.counts().secrets, 0);
+      }
       assert.equal(existsSync(join(directory, '.env')), false);
     }
-    const f = fixture(directory, ['yes', 'bad-app', 'ASETUP001', 'UCONSUMER', 'CRELAY001', 'yes', 'CRELAY001', '', '', 'yes']);
+    const f = fixture(directory, ['yes', 'yes', 'bad-app', 'ASETUP001', 'UCONSUMER', 'CRELAY001', 'yes', 'CRELAY001', '', '', 'yes']);
     assert.equal(await setup(f.options), 0);
     const text = readFileSync(join(directory, '.env'), 'utf8');
     assert.ok(text.includes('RADAR_WATCH_CHANNEL_IDS=\nRADAR_ALLOW_CHANNEL_MONITORING=\nRADAR_FOLLOW_MENTION_THREADS=\n'));
@@ -118,6 +138,7 @@ os.close(slave)
 output = bytearray()
 try:
     for prompt, answer in [
+        ('Have you installed the watcher', 'yes'),
         ('Allow read-only Slack identity', 'yes'), ('Watcher app ID (', 'ASETUP001'),
         ('Slack monitored-user token (hidden): ', '${userToken}'),
         ('Slack watcher-bot token (hidden): ', '${botToken}'),

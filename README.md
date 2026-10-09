@@ -1,7 +1,9 @@
 # Thread Watch
 
 A self-hosted Slack watcher that forwards message references to a private relay
-channel. Run it continuously on a Mac or an AWS Linux instance.
+channel. You run the watcher on your own hardware or cloud infrastructure;
+see [hosting options and platform support](docs/hosting.md) for the available
+installers and current limitations.
 
 It watches exact mentions of one configured user, optionally watches every new
 message in selected channels, and can follow subsequent replies in mentioned
@@ -35,7 +37,8 @@ can be used independently.
 ## Try it offline
 
 Use Node.js 24 and Python 3.12 or newer. The minimum Node version is 22.18;
-Python must be at least 3.10. The hosted platforms are macOS and Linux.
+Python must be at least 3.10. These checks run in CI on macOS and Linux;
+native Windows support is not implemented or tested yet.
 
 ```sh
 git clone https://github.com/Moriyan1307/thread-watch-oss.git
@@ -67,19 +70,23 @@ is working. Verify a natural qualifying event after installation.
 The recommended path is a guided wizard. You do not need to edit environment
 variables or look up the workspace, monitored-user or watcher-bot IDs yourself.
 
-1. Install the watcher using [manifest.json](manifest.json) and prepare your
-   [separate consumer](docs/consumer-setup.md). Workspace admin approval may be required.
-2. Create a private relay containing only you, the watcher bot and consumer bot.
-3. In your own private Terminal, run `npm run setup`. Enter the user and watcher
-   bot tokens in hidden prompts, supply three remaining IDs and choose your
-   monitoring preferences. The wizard verifies identity/scopes and creates `.env`
-   with private permissions; it never saves tokens or starts a worker.
-4. Follow [macOS hosting](docs/macos.md) or the separate [AWS deployment guide](docs/aws.md).
+1. In your own private Terminal, run `npm run setup`. It shows a prefilled Slack
+   app-creation link and instructions for installation, tokens and the private
+   relay. Review and approve the app in Slack; admin approval may be required.
+2. Connect a working [separate consumer](docs/consumer-setup.md). Creating an
+   empty second Slack app is not enough; the consumer needs a running service
+   or authorized workflow. This integration still requires development work.
+3. Once those prerequisites are ready, continue the prompts: enter the user and
+   watcher bot tokens with echo disabled, copy three remaining IDs and choose
+   monitoring preferences. The wizard verifies identity/scopes and creates
+   `.env` with private permissions; it never saves tokens or starts a worker.
+4. Choose an available installer from [hosting options](docs/hosting.md).
 
-See [guided setup](docs/setup.md) for prerequisites, where to find the three IDs,
-what is generated and which steps remain manual. `npm run setup -- --help`
-prints the requirements without contacting Slack. Existing `.env` files are
-left untouched; do not run the wizard to reconfigure an active installation.
+See the [beginner walkthrough](docs/setup.md) for each Slack step, where to find
+IDs, what is generated and which steps remain manual. `npm run setup -- --help`
+prints the requirements; `npm run setup -- --create-app-link` prints only the
+prefilled creation URL. Neither command contacts Slack. Existing `.env` files
+are left untouched; do not run the wizard to reconfigure an active installation.
 
 <details>
 <summary>Advanced: configure environment variables manually</summary>
@@ -140,6 +147,8 @@ expiry and requires separate private-DM approval.
 
 ## Host it
 
+- [Platform support](docs/hosting.md): available installers, other Linux hosts,
+  Windows limitations and portability work for contributors.
 - [macOS setup](docs/macos.md): login Keychain, a user LaunchAgent, fresh database
   activation, and restart/recovery limits.
 - [AWS setup](docs/aws.md): parameterized CloudFormation, encrypted EBS queue,

@@ -1,4 +1,4 @@
-import { closeSync, fsyncSync, lstatSync, openSync, unlinkSync, writeFileSync } from 'node:fs';
+import { closeSync, fsyncSync, lstatSync, openSync, readFileSync, unlinkSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { createInterface } from 'node:readline/promises';
 import { pathToFileURL } from 'node:url';
@@ -9,13 +9,23 @@ import type { FailurePhase } from './diagnostics.ts';
 import { botRelayPort, userReadPort, validateScopes } from './slack.ts';
 
 export const SETUP_HELP = `Thread Watch guided configuration
-Run npm run setup in your own private Terminal after installing the watcher
-from manifest.json and preparing a separate consumer and private relay channel.
+Run npm run setup in your own private Terminal for Slack app creation instructions,
+a prefilled creation link and guided configuration. A working separate consumer
+is still required; creating an empty second Slack app does not provide summaries.
 The wizard performs only two Slack auth.test calls, discovers installation IDs,
 and writes a private, nonsecret .env. It never reads messages, changes scopes,
 stores tokens, starts a worker or overwrites an existing configuration.
-Have the watcher app ID, consumer bot member ID and relay channel ID ready.
-macOS hosting: follow docs/macos.md after setup. AWS: follow docs/aws.md.`;
+Full beginner walkthrough: docs/setup.md. Hosting support: docs/hosting.md.
+Print the creation link without prompts or Slack access:
+  npm run setup -- --create-app-link`;
+
+export function createAppUrl(): string {
+  const manifest = JSON.parse(readFileSync(new URL('../manifest.json', import.meta.url), 'utf8'));
+  const url = new URL('https://api.slack.com/apps');
+  url.searchParams.set('new_app', '1');
+  url.searchParams.set('manifest_json', JSON.stringify(manifest));
+  return url.href;
+}
 
 export async function setup(options: {
   directory?: string; privateTerminal?: boolean;
@@ -72,6 +82,23 @@ export async function setup(options: {
     } catch (error) { if ((error as NodeJS.ErrnoException).code !== 'ENOENT') throw error; }
     process.once('SIGINT', stop); process.once('SIGTERM', stop);
     report(SETUP_HELP);
+    report(`Before entering tokens, complete these steps in Slack (full instructions: docs/setup.md):
+1. Sign in as the person whose mentions you want to watch. Open this link, choose
+   that workspace, review the prefilled settings and create the watcher app:
+   ${createAppUrl()}
+   If the link is unavailable, use Create New App > From a manifest and paste
+   the output of node scripts/print-manifest.mjs. The manifest enables Socket Mode.
+2. In the app's OAuth & Permissions page, choose Install to Workspace and approve
+   the listed permissions. Keep its User OAuth Token (xoxp-) and Bot User OAuth
+   Token (xoxb-) available for the hidden prompts below; do not paste them in chat.
+3. In Basic Information > App-Level Tokens, generate a token with ONLY
+   connections:write. Keep this xapp- token for the host credential tool later.
+4. Connect a working separate consumer bot in the same workspace. See
+   docs/consumer-setup.md; this wizard does not install or run that service.
+5. In Slack, create a private relay channel and add the watcher and consumer bots.
+   It must contain exactly you and those two bots. Workspace admin approval may
+   be required for app installation. Copy IDs when the prompts below ask for them.`);
+    await required('Have you installed the watcher, generated its app token, connected a working separate consumer and prepared the private relay?');
     await required('Allow read-only Slack identity and permission checks using the user and watcher-bot tokens you enter?');
     const appId = await id('Watcher app ID (Basic Information on api.slack.com/apps)', 'A');
     const userToken = await token('Slack monitored-user token', 'user_token');
@@ -133,7 +160,7 @@ export async function setup(options: {
     } catch (error) { unlinkSync(path); throw error; }
     finally { closeSync(fd); }
     report('Thread Watch setup: saved private .env (0600). No tokens were saved and no worker was started.');
-    report('Next: docs/macos.md for Mac hosting or docs/aws.md for AWS. Enter all three tokens again only in the host credential tool; setup does not store them.');
+    report('Next: docs/hosting.md lists available hosting paths. Enter all three tokens again only in the host credential tool; setup does not store them. A working consumer is required for summaries.');
     return 0;
   } catch (error) {
     report(formatStartupFailure(controller.signal.aborted ? new StartupFailure(phase, 'cancelled') : error, phase));
@@ -143,6 +170,7 @@ export async function setup(options: {
 }
 if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
   if (process.argv.length === 3 && process.argv[2] === '--help') process.stdout.write(`${SETUP_HELP}\n`);
-  else if (process.argv.length > 2) { process.stderr.write('Use npm run setup with private prompts, or --help. Tokens and other arguments are not accepted.\n'); process.exitCode = 1; }
+  else if (process.argv.length === 3 && process.argv[2] === '--create-app-link') process.stdout.write(`${createAppUrl()}\n`);
+  else if (process.argv.length > 2) { process.stderr.write('Use npm run setup with private prompts, --help or --create-app-link. Tokens and other arguments are not accepted.\n'); process.exitCode = 1; }
   else process.exitCode = await setup();
 }
