@@ -155,7 +155,10 @@ test('exclusive local queue lock prevents a second process from recovering activ
 test('hidden credential input never echoes values, restores terminal mode, rejects non-TTY input and cancellation', async () => {
   class Input extends EventEmitter { isTTY = true; isRaw = false; paused = false;
     setRawMode(raw: boolean) { this.isRaw = raw; } resume() {} pause() { this.paused = true; } }
-  const input = new Input(); const writes: string[] = []; const output = { isTTY: true, write: (s: string) => writes.push(s) };
+  const input = new Input(); const writes: string[] = []; const output = { isTTY: true, write: (s: string) => {
+    if (s.includes('(hidden):')) assert.equal(input.isRaw, true, 'Echo must be disabled when a paste prompt is visible');
+    writes.push(s);
+  } };
   const pending = readHiddenToken('Synthetic token', input, output);
   input.emit('data', Buffer.from('xapp-public-synthetic\r'));
   assert.equal(await pending, 'xapp-public-synthetic'); assert.equal(input.isRaw, false); assert.equal(input.paused, true);

@@ -12,18 +12,25 @@ privacy permissions are inconvenient. A wired connection is useful but optional.
 
 ## Fresh installation
 
-First complete the Slack/consumer setup and `.env` configuration in the
-[README](../README.md). No AWS account or database import is required.
+First complete the Slack/consumer prerequisites in the [README](../README.md).
+Use the guided setup to generate `.env` instead of editing it manually.
+No AWS account or database import is required.
 Run these commands in your **own private Mac Terminal** from the repository:
 
 ```sh
 npm ci --ignore-scripts
+npm run setup
 npm run build
 python3 mac/service.py prepare --config .env
 python3 mac/set-credentials.py
 python3 mac/service.py activate --fresh
 python3 mac/service.py status
 ```
+
+Skip `npm run setup` if you already have a configured `.env`. Setup uses hidden
+user/bot token prompts for identity checks only; it does not save credentials.
+The host credential step below asks for all three tokens again to store them
+directly in your login Keychain.
 
 `prepare` validates nonsecret settings, FileVault, the Node runtime and its
 preflight. It records absolute Node/Python paths and bootstraps an inactive

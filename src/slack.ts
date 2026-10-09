@@ -6,7 +6,7 @@ import type { Mention, SummarySink, ThreadContext, ThreadMessage, ThreadReader }
 import { ScopeMismatchFailure, StartupFailure, startupFailure } from './diagnostics.ts';
 import type { FailurePhase } from './diagnostics.ts';
 
-function validateScopes(actual: readonly string[] | undefined, required: readonly string[], phase: FailurePhase): void {
+export function validateScopes(actual: readonly string[] | undefined, required: readonly string[], phase: FailurePhase): void {
   if (!actual || !actual.length || actual.every(scope => !scope)) throw new StartupFailure(phase, 'scope_metadata_missing');
   // Slack adds the legacy identify scope in the background for some user
   // tokens. Its ability is inherent to user tokens; it is not an additional
