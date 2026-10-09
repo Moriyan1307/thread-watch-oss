@@ -35,7 +35,8 @@ export function readHiddenToken(label: string, input: PrivateInput = process.std
         if (value.length > 4096) { finish('format'); return; }
       }
     };
-    output.write(`${label} (hidden): `); input.setRawMode(true); input.on('data', handle); input.resume();
+    // Disable echo before publishing the prompt, including an immediate paste.
+    input.setRawMode(true); input.on('data', handle); output.write(`${label} (hidden): `); input.resume();
     signal?.addEventListener('abort', cancel, { once: true });
     if (signal?.aborted) cancel();
   });
