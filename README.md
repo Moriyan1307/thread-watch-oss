@@ -10,6 +10,30 @@ message in selected channels, and can follow subsequent replies in mentioned
 threads. A durable SQLite queue deduplicates events, retries definite failures,
 and quarantines uncertain delivery to avoid automatic duplicate posts.
 
+## Project status
+
+Thread Watch is open source under [MIT](LICENSE): you can use, modify,
+redistribute and sell the code while retaining the license notice. This does not
+grant access to anyone's Slack data or replace Slack's API/distribution terms.
+The `private` flag in `package.json` prevents accidental npm publication; the
+source repository and its license are public.
+
+The current audience is developers and operators building a private Slack
+workflow. This is an early self-hosted release, not a managed service or a
+zero-configuration Slack Marketplace app.
+
+| Available now | Still required or planned |
+| --- | --- |
+| Mention/channel/thread monitoring, durable metadata relay and offline demos | A running separate consumer for private updates; the included adapter needs integration |
+| Guided Slack app creation and nonsecret configuration | Owner-approved Slack installation and private credential setup |
+| macOS and AWS Linux installers; CI on macOS and Ubuntu | Fresh live acceptance on your installation; generic Linux/container/Windows installers |
+| Public source, MIT license, security reporting and protected-main checks | Multi-workspace OAuth, managed hosting, action inbox and Marketplace approval |
+
+See the [production and Slack distribution roadmap](docs/production-roadmap.md)
+for the remaining work, release gates and proposed product direction. Planned
+features in that document are not included in this release. Follow the default
+branch for the guided setup; the older `v0.1.0` tag predates that wizard.
+
 **The continuous worker is a metadata relay.** It does not generate AI summaries,
 research topics, or read full threads. A separate consumer bot must receive the
 references, access the original source using its own authorized Slack connection,
@@ -164,5 +188,13 @@ start/deploy hooks deliberately fail closed; they do not bypass owner setup.
 
 ## Contribute
 
-See [CONTRIBUTING.md](CONTRIBUTING.md) and [SECURITY.md](SECURITY.md).
-Licensed under [MIT](LICENSE).
+For reproducible bugs, setup questions or feature proposals, use
+[GitHub issues](https://github.com/Moriyan1307/thread-watch-oss/issues). Include
+your OS/runtime versions, the command, expected behavior and sanitized fixed
+status labels. Keep credentials, real Slack IDs/content and queue files private.
+Report vulnerabilities privately as described in [SECURITY.md](SECURITY.md).
+
+[CONTRIBUTING.md](CONTRIBUTING.md) covers local development, the source map and
+the pull-request checks. Portability work and a complete consumer runner are
+useful starting points; discuss the intended behavior before expanding scopes
+or changing the relay protocol. Licensed under [MIT](LICENSE).
